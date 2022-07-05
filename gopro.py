@@ -7,7 +7,7 @@ import sys
 
 from pathlib import Path
 is_main = __name__ == '__main__'
-
+log_file = f'gopro_logs_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
 if is_main:
     if sys.platform == 'win32':
         output = os.environ['USERPROFILE']
@@ -18,15 +18,24 @@ if is_main:
         os.mkdir(output)
     logs = os.path.join(
         output
-        ,f'gopro_logs_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.txt'
+        ,log_file
         )
-    logging.basicConfig(
-        filename=logs
-        ,format='%(asctime)s %(levelname)-8s %(message)s'
-        ,datefmt='%Y-%m-%d %H:%M:%S'
-        ,level=logging.DEBUG
-        )
-    
+else:
+    logs = os.path.join(os.path.dirname(__name__),log_file)
+    output = 'somePath'
+
+file_handler = logging.FileHandler(filename=logs)
+stdout_handler = logging.StreamHandler(sys.stdout)
+handlers = [file_handler, stdout_handler]
+
+logging.basicConfig(
+    # filename=logs
+    handlers=handlers
+    # ,format='%(asctime)s %(levelname)-8s %(message)s'
+    ,format = '[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s'
+    ,datefmt='%Y-%m-%d %H:%M:%S'
+    ,level=logging.DEBUG
+    )
 
 def get_chaptered(path:str) -> list:
     """
@@ -80,13 +89,19 @@ def join_chaptered(d:dict,dest:str) -> None:
         file_cmd = os.path.join(dest,fileid+'.txt')
         with open(file_cmd,'w') as f:
             f.write('\n'.join(fileorder))
-        subprocess.run(
+        logging.info('merging files:\n\t{0}'.format('\n\t'.join(files.values())))
+        process_output = subprocess.Popen(
             ['ffmpeg'
             ,'-safe','0'
             ,'-f','concat'
             ,'-i',file_cmd
             ,'-c','copy',output]
+            # ,capture_output=True
+            # ,text=True
+            ,stdout=subprocess.PIPE,stdin=subprocess.PIPE,stderr=subprocess.PIPE
         )
+        std = process_output.communicate(b'\n')
+        logging.info('ffmpeg output: \n{0}'.format(std[1].decode('ascii')))
 
 if is_main:
     path = r"C:\Users\jarre\Desktop\Videos\Meme & Dede's 60th Anniversary"
